@@ -8,27 +8,12 @@ import requests
 from config import Config
 from models import Course
 from exceptions import LoginError, EvaluationError
-from utils import logger, ocr, encode_password, recognize_captcha
-
-
-
-
-
-
-
-
+from utils import logger, ocr, encode_password
 
 
 class SCUEvaluation:
     """四川大学教务系统评教类"""
-
-    def __init__(self, username: str, password: str):
-        self.username = username
-        self.password = self._encode_password(password)
-        self.session = requests.Session()
-        self.session.headers.update(Config.DEFAULT_HEADERS)
-        self.courses: List[Course] = []
-
+    
     def __init__(self, username: str, password: str):
         self.username = username
         self.password = encode_password(password)
@@ -61,9 +46,6 @@ class SCUEvaluation:
             logger.error(f"获取验证码失败: {e}")
             raise LoginError("获取验证码失败") from e
 
-
-
-    
     def login(self, max_attempts: int = 3) -> bool:
         """登录系统"""
         for attempt in range(max_attempts):
@@ -75,12 +57,6 @@ class SCUEvaluation:
                         img_bytes = f.read()
 
                     captcha_text = ocr.classification(img_bytes)
-                    # os.system(f"open {captcha_path}")
-                    # logger.info("验证码图片已打开，请查看")
-
-                # captcha_text = input("请输入验证码: ")
-                # print(captcha_path)
-                # captcha_text = self._recognize_captcha(captcha_path)
                 logger.info(f"OCR识别验证码为: {captcha_text}")
 
                 # 清理验证码文件

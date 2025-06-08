@@ -1,21 +1,23 @@
 from evaluation import SCUEvaluation
 import logging
+import sys
 
 logger = logging.getLogger(__name__)
+
 
 def main():
     while True:
         try:
             username = input("请输入学号(输入q退出): ")
             if username.lower() == 'q':
-                break
-                
+                sys.exit(0)
+
             password = input("请输入密码: ")
             evaluator = SCUEvaluation(username, password)
 
             if not evaluator.login():
                 logger.error("登录失败，请检查学号密码")
-                continue
+                sys.exit(1)
 
             while True:
                 courses = evaluator.get_courses()
@@ -46,12 +48,16 @@ def main():
                             evaluator.evaluate_course(courses[idx])
                         else:
                             logger.warning(f"无效的课程编号: {idx}")
+            continue_choice = input("\n是否继续评教其他账号? (y/n): ")
+            if continue_choice.lower() != 'y':
+                break
 
         except Exception as e:
             logger.error(f"程序执行出错: {e}")
         finally:
             if 'evaluator' in locals():
                 evaluator.session.close()
+
 
 if __name__ == "__main__":
     main()
