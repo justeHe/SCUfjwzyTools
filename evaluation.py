@@ -4,6 +4,7 @@ import os
 from bs4 import BeautifulSoup
 from requests_toolbelt.multipart.encoder import MultipartEncoder
 import requests
+import random
 
 from config import Config
 from models import Course
@@ -20,6 +21,7 @@ class SCUEvaluation:
         self.session = requests.Session()
         self.session.headers.update(Config.DEFAULT_HEADERS)
         self.courses: List[Course] = []
+        self.flag = None
 
     def _get_token(self) -> str:
         """获取token"""
@@ -83,10 +85,16 @@ class SCUEvaluation:
 
         return False
 
-    def get_courses(self) -> List[Course]:
-        """获取待评教课程列表"""
+    def get_courses(self, flag: str = "ktjs") -> List[Course]:
+        """获取待评教课程列表
+        :param flag: 评教类型，ktjs为课程及时评教，kt为期末评教
+        """
         try:
-            data = {"pageNum": "1", "pageSize": "30", "flag": "kt"}
+            data = {"pageNum": "1", "pageSize": "30", "flag": flag}
+            if flag == "ktjs":
+                self.flag = "ktjs"
+            else:
+                self.flag = "kt"
             response = self.session.post(Config.PJ_URL, data=data)
             response.raise_for_status()
 
@@ -96,12 +104,12 @@ class SCUEvaluation:
                     name=course["KCM"],
                     ktid=course["KTID"],
                     wjbm=course["WJBM"],
+                    type_name=course["WJMC"],
                     is_evaluated=(course["SFPG"] == "1"),
                 )
                 for course in courses_data
                 if course["SFPG"] == "0"  # 只获取未评教的课程
             ]
-
             return self.courses
 
         except Exception as e:
@@ -131,7 +139,9 @@ class SCUEvaluation:
             # 第一次提交
             form_data["tjcs"] = "0"
             response = self._submit_evaluation(submit_url, form_data)
-
+            if response.json()["result"] == "no":
+                logger.error(f"课程 {course.name} 评教失败: {response.json()["msg2"]}")
+                return False
             # 第二次提交
             form_data["tjcs"] = "1"
             form_data["tokenValue"] = response.json()["token"]
@@ -169,6 +179,8 @@ class SCUEvaluation:
                 form_data[name] = "100"
             elif input_elem["type"] == "radio" and name not in form_data:
                 form_data[name] = input_elem["value"]
+            elif input_elem["type"] == "radio" and self.flag == "ktjs":
+                form_data[name] = max(form_data[name], input_elem["value"])
             elif input_elem["type"] == "checkbox":
                 if name not in form_data:
                     form_data[name] = []
@@ -178,10 +190,14 @@ class SCUEvaluation:
         # 处理文本域
         textarea = soup.find("textarea", {"maxlength": "500"})
         if textarea:
-            form_data[textarea["name"]] = (
-                "这门课程的教学效果很好,老师热爱教学,教学方式生动有趣,"
-                "课程内容丰富且贴合时代特点。"
-            )
+            comments = [
+                "这门课程的教学效果很好,老师热爱教学,教学方式生动有趣,课程内容丰富且贴合时代特点。",
+                "老师教学认真负责,课程内容系统全面,理论与实践结合得很好,让我受益匪浅。",
+                "课程设计合理,老师讲解清晰,课堂互动性强,能够激发学生的学习兴趣。",
+                "教学方式新颖,案例丰富,能够将抽象的理论知识转化为生动的实践内容。",
+                "老师专业素养高,教学态度认真,能够因材施教,关注每个学生的学习情况。"
+            ]
+            form_data[textarea["name"]] = random.choice(comments)
 
         return form_data
 
@@ -216,54 +232,3 @@ class SCUEvaluation:
         response.raise_for_status()
         return response
 
-
-def main():
-    """主函数"""
-    try:
-        username = input("请输入学号: ")
-        password = input("请输入密码: ")
-
-        evaluator = SCUEvaluation(username, password)
-
-        if not evaluator.login():
-            logger.error("登录失败，请检查学号密码")
-            return
-
-        courses = evaluator.get_courses()
-        if not courses:
-            logger.info("没有待评教课程")
-            return
-
-        logger.info(f"共有 {len(courses)} 门待评教课程:")
-        for i, course in enumerate(courses):
-            print(f"{i}. {course.name}")
-        print(f"{len(courses)}. 一键评教所有课程")
-        print(f"{len(courses) + 1}. 退出")
-
-        choice = input("\n请输入需要评教的课程编号(空格分隔): ")
-        if not choice.strip():
-            logger.error("未输入编号")
-            return
-
-        choices = list(map(int, choice.split()))
-        if choices[0] == len(courses) + 1:
-            return
-        elif choices[0] == len(courses):
-            for course in courses:
-                evaluator.evaluate_course(course)
-        else:
-            for idx in choices:
-                if 0 <= idx < len(courses):
-                    evaluator.evaluate_course(courses[idx])
-                else:
-                    logger.warning(f"无效的课程编号: {idx}")
-
-    except Exception as e:
-        logger.error(f"程序执行出错: {e}")
-    finally:
-        if "evaluator" in locals():
-            evaluator.session.close()
-
-
-if __name__ == "__main__":
-    main()

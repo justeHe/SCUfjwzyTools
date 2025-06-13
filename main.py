@@ -20,14 +20,25 @@ def main():
                 sys.exit(1)
 
             while True:
-                courses = evaluator.get_courses()
+                print("1. 课程及时评教")
+                print("2. 期末评教")
+                print("3. 退出")
+                eval_type = input("请选择评教类型(1/2/3): ")
+                if eval_type == "3":
+                    sys.exit(0)
+                flag = "ktjs" if eval_type == "1" else "kt"
+                courses = evaluator.get_courses(flag)
                 if not courses:
                     logger.info("没有待评教课程")
-                    break
-
+                    continue_choice = input("\n是否返回主菜单? (y/n): ")
+                    if continue_choice.lower() == 'y':
+                        continue
+                    else:
+                        break
+                    
                 logger.info(f"共有 {len(courses)} 门待评教课程:")
                 for i, course in enumerate(courses):
-                    print(f"{i}. {course.name}")
+                    print(f"{i}. {course.type_name} {course.name}")
                 print(f"{len(courses)}. 一键评教所有课程")
                 print(f"{len(courses)+1}. 返回")
 
@@ -38,7 +49,7 @@ def main():
 
                 choices = list(map(int, choice.split()))
                 if choices[0] == len(courses)+1:
-                    break
+                    continue
                 elif choices[0] == len(courses):
                     for course in courses:
                         evaluator.evaluate_course(course)
