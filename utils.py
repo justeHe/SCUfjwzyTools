@@ -25,6 +25,6 @@ with suppress_stdout():
 
 def encode_password(password: str) -> str:
     """密码加密"""
-    md5_1 = hashlib.md5((password + "{Urp602019}").encode()).hexdigest()
-    md5_2 = hashlib.md5(password.encode()).hexdigest()
+    md5_1 = hashlib.md5(hashlib.md5((password + "{Urp602019}").encode()).hexdigest().encode()).hexdigest()
+    md5_2 = hashlib.md5(hashlib.md5(password.encode()).hexdigest().encode()).hexdigest()
     return f"{md5_1}*{md5_2}"
